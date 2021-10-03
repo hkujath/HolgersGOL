@@ -1,0 +1,38 @@
+
+<assembly xmlns="http://maven.apache.org/ASSEMBLY/2.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.0.0 http://maven.apache.org/xsd/assembly-2.0.0.xsd">
+	<id>build-zip</id>
+	<includeBaseDirectory>false</includeBaseDirectory>
+	<formats>
+		<format>zip</format>
+	</formats>
+	<fileSets>
+		<!-- copy build data -->
+		<fileSet>
+			<directory>${project.build.directory}/holgersgol</directory>
+			<outputDirectory>.</outputDirectory>
+			<excludes>
+				<exclude>*~</exclude>
+				<exclude>**/*.bak</exclude>
+			</excludes>
+		</fileSet>
+
+		
+		<!-- copy logback -->
+		<fileSet>
+			<directory>src/main/resources</directory>
+			<outputDirectory>lib</outputDirectory>
+			<includes>
+				<include>logback.xml</include>
+			 </includes>
+		</fileSet>
+		<!-- Copy start batch -->
+		<fileSet>
+			<directory>src/main/resources</directory>
+			<outputDirectory>bin</outputDirectory>
+			<includes>
+				<include>start.bat</include>
+			 </includes>
+		</fileSet>
+	</fileSets>
+</assembly>
