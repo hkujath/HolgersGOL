@@ -5,9 +5,9 @@ import de.hkujath.holgersgol.utils.IToolVersion;
 public class Version implements IToolVersion {
 
   /** build version */
-  private final static String BUILD     = "0.0.1-SNAPSHOT";
+  private final static String BUILD     = "0.0.2-SNAPSHOT";
   /** build date */
-  private final static String BUILDDATE = "2021/10/03";
+  private final static String BUILDDATE = "2021/10/06";
   /** tool name */
   private final static String NAME      = "Holgers GOL";
   /** ID */

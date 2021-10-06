@@ -1,46 +1,72 @@
 package de.hkujath.holgersgol;
 
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.ResourceBundle;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import de.hkujath.holgersgol.data.IGOLData;
 import de.hkujath.holgersgol.data.impl.GOLData;
 import de.hkujath.holgersgol.exceptions.GOLException;
+import de.hkujath.holgersgol.utils.GOLHelper;
 import javafx.animation.Animation;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
 import javafx.application.Platform;
+import javafx.beans.value.ChangeListener;
+import javafx.beans.value.ObservableValue;
 import javafx.fxml.FXML;
+import javafx.fxml.Initializable;
 import javafx.scene.Group;
+import javafx.scene.canvas.Canvas;
+import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Button;
+import javafx.scene.control.Label;
 import javafx.scene.control.TextField;
 import javafx.scene.layout.AnchorPane;
+import javafx.scene.layout.Border;
+import javafx.scene.layout.BorderStroke;
+import javafx.scene.layout.BorderStrokeStyle;
+import javafx.scene.layout.BorderWidths;
+import javafx.scene.layout.CornerRadii;
 import javafx.scene.layout.Pane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
+import javafx.stage.Stage;
 import javafx.util.Duration;
 import javafx.scene.control.Alert.AlertType;
 
-public class MainController {
+public class MainController implements Initializable {
 
   @FXML
-  private transient Button    btnStart;
+  private Button              btnStart;
 
   @FXML
-  private transient TextField tfXValue;
+  private TextField           tfXValue;
 
   @FXML
-  private transient TextField tfYValue;
+  private TextField           tfYValue;
 
   @FXML
-  private transient TextField tfNumGens;
+  private TextField           tfNumGens;
 
   @FXML
-  private transient VBox      vbPrintArea;
+  private Canvas              cDrawingArea;
+
+  @FXML
+  private Label               lblGenNumber;
+
+  @FXML
+  private AnchorPane          apMainWindow;
+
+  GOLWorkerService            service;
+
+  private Stage               mainStage      = null;
 
   /** logger instance */
   private static final Logger LOG            = LoggerFactory.getLogger(MainController.class);
@@ -51,6 +77,38 @@ public class MainController {
   private static final double DEFAULT_HEIGHT = 20;
   /***/
   private static final double DEFAULT_SPACE  = 10;
+
+  /**
+   * Default constructor
+   * 
+   *
+   * @author Kujath, Holger
+   * @since 05.10.2021
+   */
+  public MainController() {
+
+  }
+
+  /**
+   * 
+   * @param mainStage the main stage of the app.
+   *
+   * @author Kujath, Holger
+   * @since 05.10.2021
+   */
+  public void setStage(Stage mainStage) {
+    this.mainStage = mainStage;
+  }
+
+  /*
+   * (non-Javadoc)
+   * 
+   * @see javafx.fxml.Initializable#initialize(java.net.URL, java.util.ResourceBundle)
+   */
+  @Override
+  public void initialize(URL location, ResourceBundle resources) {
+    // Empty
+  }
 
   /**
    * 
@@ -66,7 +124,7 @@ public class MainController {
     String strYVal = tfYValue.getText();
     String strNumGens = tfNumGens.getText();
 
-    //Validate number of generations to calculate.
+    // Validate number of generations to calculate.
     int numGens;
     try {
       numGens = Integer.parseInt(strNumGens);
@@ -80,52 +138,58 @@ public class MainController {
       return;
     }
 
-    //Validate grid dimensions.
+    // Validate grid dimensions.
     GOLData gameData = checkInputData(strXVal, strYVal);
-    if (gameData == null)
-      return;
-
-    //Init grid
-    try {
-      gameData.initializeGrid();
-    } catch (GOLException e) {
-      showDialog(AlertType.ERROR, "Can't play the game. Reason: " + e.getLocalizedMessage());
+    if (gameData == null) {
+      showDialog(AlertType.ERROR, "Can't play the game. Given dimensions are invalid.");
       return;
     }
 
-    LOG.debug("Starting game of life....");
-    printGeneration(0, gameData.getGenerationData());
-
-    //Calc the pane size
-    //    pPrintArea.setMinSize(gameData.getSizeX() * DEFAULT_WIDTH + gameData.getSizeX() * DEFAULT_SPACE,
-    //        gameData.getSizeY() * DEFAULT_HEIGHT + gameData.getSizeY() * DEFAULT_SPACE);
-
-    //Calc generations
-
+    //Start the service
     try {
-      for (int i = 0; i < numGens; i++) {
-        gameData.calcNextGeneration();
-        printGeneration(i + 1, gameData.getGenerationData());
-        LOG.debug("");
-        try {
-          Thread.sleep(500);
-        } catch (InterruptedException e) {
-        }
+
+      if (service != null && service.isRunning()) {
+        service.cancel();
       }
 
+      service = new GOLWorkerService(gameData, numGens);
+
+      service.currenGenerationProperty().addListener((observable, oldValue, newValue) -> {
+        LOG.debug("Valued Changed. Current generation: {}", newValue);
+
+        Platform.runLater(() -> {
+          lblGenNumber.setText("Generation " + newValue);
+          try {
+            drawShapes(service.getGOLData().getGridData());
+          } catch (GOLException e) {
+            LOG.error("Can update GUI with data grid information.");
+          }
+        });
+
+      });
+
     } catch (GOLException e) {
-      showDialog(AlertType.ERROR, "Can't play the game. Reason: " + e.getLocalizedMessage());
-      return;
+      LOG.error("Start of the GOLService failed. Reason: {}", e.getLocalizedMessage());
     }
 
-    //printGeneration(numGens, gameData.getGenerationData());
-    LOG.debug("Finished game of life....");
+    LOG.debug("Starting GOLWorkerService...");
+    service.start();
+
   }
 
-  private static void printGeneration(int genNumber, int[][] inData) {
+  /**
+   * Function is used to print a generation
+   * 
+   * @param genNumber
+   * @param inData
+   *
+   * @author Kujath, Holger
+   * @since 04.10.2021
+   */
+  private static void printGeneration(int genNumber, GOLData inData) {
     LOG.debug("Grid of generation {}", genNumber);
     try {
-      GOLData.printGrid(inData);
+      GOLHelper.print2DArray(inData.getGridData());
     } catch (GOLException e) {
       LOG.debug("Failed to print grid data.");
     }
@@ -147,7 +211,6 @@ public class MainController {
       xVal = Integer.parseInt(strXVal);
     } catch (NumberFormatException e) {
       LOG.error("Cant parse x value [{}]", strXVal);
-      showDialog(AlertType.ERROR, "Can't play the game. X dimension is invalid.");
       return null;
     }
 
@@ -156,16 +219,13 @@ public class MainController {
       yVal = Integer.parseInt(strYVal);
     } catch (NumberFormatException e) {
       LOG.error("Cant parse y value [{}]", strXVal);
-      showDialog(AlertType.ERROR, "Can't play the game. Y dimension is invalid.");
       return null;
     }
 
     GOLData gameData;
     try {
       gameData = new GOLData(xVal, yVal);
-
     } catch (GOLException e) {
-      showDialog(AlertType.ERROR, "Can't play the game. Given dimensions are invalid.");
       return null;
     }
 
@@ -194,9 +254,10 @@ public class MainController {
    * @throws GOLException
    *
    * @author Kujath, Holger
-   * @since 03.10.2021
+   * @since 05.10.2021
    */
-  private static List<Rectangle> calc2DGridData(int[][] inGridData) throws GOLException {
+  private void drawShapes(int[][] inGridData) throws GOLException {
+
     if (inGridData == null) {
       throw new GOLException("Given grid data is invalid.");
     }
@@ -204,22 +265,35 @@ public class MainController {
     int dataMaxSizeX = inGridData[0].length;
     int dataMaxSizeY = inGridData.length;
 
-    List<Rectangle> rects = new ArrayList<>();
+    // Calc generations
+    GraphicsContext gc = cDrawingArea.getGraphicsContext2D();
+
+    cDrawingArea.setWidth(dataMaxSizeX * DEFAULT_WIDTH + dataMaxSizeX * DEFAULT_SPACE);
+    cDrawingArea.setHeight(dataMaxSizeY * DEFAULT_HEIGHT + dataMaxSizeY * DEFAULT_SPACE);
+
+    gc.clearRect(0, 0, cDrawingArea.getWidth(), cDrawingArea.getHeight());
+
+    gc.setFill(Color.BLACK);
+    gc.setStroke(Color.BLUE);
+
     for (int yPos = 0; yPos < dataMaxSizeY; yPos++) {
 
       for (int xPos = 0; xPos < dataMaxSizeX; xPos++) {
-
-        Rectangle rectangle = new Rectangle(xPos * DEFAULT_WIDTH + DEFAULT_SPACE * xPos,
-            yPos * DEFAULT_HEIGHT + DEFAULT_SPACE * yPos, DEFAULT_WIDTH, DEFAULT_HEIGHT);
         boolean isCellAlive = inGridData[yPos][xPos] == 1;
 
-        rectangle.setStroke(Color.BLACK);
-        rectangle.setFill(isCellAlive ? Color.BLACK : Color.WHITE);
-        rects.add(rectangle);
+        double drawinvXPos = xPos * DEFAULT_WIDTH + DEFAULT_SPACE * xPos;
+        double drawingYPos = yPos * DEFAULT_HEIGHT + DEFAULT_SPACE * yPos;
+
+        if (isCellAlive) {
+          gc.fillRect(drawinvXPos, drawingYPos, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+        } else {
+          gc.strokeRect(drawinvXPos, drawingYPos, DEFAULT_WIDTH, DEFAULT_HEIGHT);
+        }
       }
     }
 
-    return rects;
+    mainStage.sizeToScene();
+
   }
 
 }

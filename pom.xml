@@ -4,7 +4,7 @@
 	<modelVersion>4.0.0</modelVersion>
 	<groupId>de.hkujath</groupId>
 	<artifactId>holgersgol</artifactId>
-	<version>0.0.1-SNAPSHOT</version>
+	<version>0.0.2-SNAPSHOT</version>
 	<name>holgersgol</name>
 
 	<inceptionYear>2021</inceptionYear>
@@ -227,8 +227,28 @@
 				<artifactId>javafx-maven-plugin</artifactId>
 				<version>0.0.6</version>
 				<configuration>
-					<mainClass>${manifest.mainclass}</mainClass>
+
+
 				</configuration>
+				<executions>
+					<execution>
+						<!-- Default configuration for running -->
+						<id>default-cli</id>
+						<configuration>
+							<mainClass>${manifest.mainclass}</mainClass>
+						</configuration>
+					</execution>
+					<execution>
+						<!-- Configuration for debugging -->
+						<id>debug</id>
+						<configuration>
+							<options>
+								<option>-agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=*:8000</option>
+							</options>
+							<mainClass>${manifest.mainclass}</mainClass>
+						</configuration>
+					</execution>
+				</executions>
 			</plugin>
 		</plugins>
 		<pluginManagement>
